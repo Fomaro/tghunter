@@ -1,14 +1,14 @@
 """
 Tests for Scoring Engine & Auction Eligibility
 """
-from telegram_username_hunter.analysis.scoring import UsernameScorer
 from telegram_username_hunter.analysis.auction_eligibility import AuctionEligibilityAnalyzer
 from telegram_username_hunter.analysis.market_analysis import MarketPotentialAnalyzer
+from telegram_username_hunter.analysis.scoring import UsernameScorer
 from telegram_username_hunter.config.settings import (
-    UsernameStatus,
+    AuctionEligibility,
     BotStatus,
     PremiumBotStatus,
-    AuctionEligibility,
+    UsernameStatus,
 )
 
 

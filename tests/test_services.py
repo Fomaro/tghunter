@@ -1,10 +1,12 @@
 """
 Tests for Search Pipeline & Export Services
 """
-import tempfile
 import gc
+import tempfile
 from pathlib import Path
+
 import pytest
+
 from telegram_username_hunter.config.settings import (
     AppSettings,
     BotStatus,
@@ -17,9 +19,9 @@ from telegram_username_hunter.database.models import (
     PremiumAliasRecord,
     UsernameRecord,
 )
+from telegram_username_hunter.services.cache_service import CacheService
 from telegram_username_hunter.services.export_service import ExportService
 from telegram_username_hunter.services.search_service import SearchService
-from telegram_username_hunter.services.cache_service import CacheService
 
 
 @pytest.fixture
@@ -118,7 +120,7 @@ def test_export_service_files_generated(test_env):
     exporter.run_all_auto_exports(min_score=70)
 
     # Markdown reports verification
-    md_reports = exporter.export_all_markdown_reports()
+    exporter.export_all_markdown_reports()
     assert (exp_path / "1_available.md").exists()
     assert (exp_path / "2_fragment_purchase.md").exists()
     assert (exp_path / "3_occupied.md").exists()
@@ -139,27 +141,15 @@ def test_export_service_files_generated(test_env):
         assert "taken1" in occ_md
         assert "avail1" not in occ_md
 
-    # Check that expected files are created
-    assert (exp_path / "available_usernames.txt").exists()
-    assert (exp_path / "premium_selection.txt").exists()
-    assert (exp_path / "available_bot_names.txt").exists()
-    assert (exp_path / "bot_selection.txt").exists()
-    assert (exp_path / "premium_bot_names.txt").exists()
-    assert (exp_path / "premium_bot_selection.txt").exists()
-    assert (exp_path / "unknown_names.txt").exists()
-    assert (exp_path / "all_usernames.csv").exists()
-    assert (exp_path / "all_bot_names.csv").exists()
-    assert (exp_path / "premium_aliases.csv").exists()
+    # Check that legacy .txt and .csv are NOT generated and cleaned up
+    assert not (exp_path / "available_usernames.txt").exists()
+    assert not (exp_path / "premium_selection.txt").exists()
+    assert not (exp_path / "all_usernames.csv").exists()
+    assert not (exp_path / "all_bot_names.csv").exists()
+    assert not (exp_path / "premium_aliases.csv").exists()
 
-    # Rule check: available_usernames.txt should NOT contain taken or unknown names
-    with open(exp_path / "available_usernames.txt", "r", encoding="utf-8") as f:
-        content = f.read()
-        assert "avail1" in content
-        assert "taken1" not in content
-        assert "unknown1" not in content
-
-    # unknown_names.txt should contain unknown1
-    with open(exp_path / "unknown_names.txt", "r", encoding="utf-8") as f:
+    # 6_unknown.md should contain unknown1
+    with open(exp_path / "6_unknown.md", "r", encoding="utf-8") as f:
         unknown_content = f.read()
         assert "unknown1" in unknown_content
 

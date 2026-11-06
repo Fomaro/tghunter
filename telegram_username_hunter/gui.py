@@ -1062,7 +1062,7 @@ class HunterApp(ctk.CTk):
         lbl_b.pack(side="left")
         view.lbl_b = lbl_b
 
-        btn_exp_b = ctk.CTkButton(top_b, text="📥 Export bot_selection.txt", width=160, command=lambda: self.export_service.export_bot_selection(70))
+        btn_exp_b = ctk.CTkButton(top_b, text="📥 Экспорт (.md)", width=160, command=lambda: self._trigger_export("BOT"))
         btn_exp_b.pack(side="right")
         view.btn_exp_b = btn_exp_b
 
@@ -1085,7 +1085,7 @@ class HunterApp(ctk.CTk):
         lbl_a.pack(side="left")
         view.lbl_a = lbl_a
 
-        btn_exp_a = ctk.CTkButton(top_a, text="📥 Export premium_bot_selection.txt", width=200, command=lambda: self.export_service.export_premium_bot_selection(70))
+        btn_exp_a = ctk.CTkButton(top_a, text="📥 Экспорт (.md)", width=160, command=lambda: self._trigger_export("PREMIUM_BOT"))
         btn_exp_a.pack(side="right")
         view.btn_exp_a = btn_exp_a
 
@@ -1439,19 +1439,6 @@ class HunterApp(ctk.CTk):
 
     def _trigger_export(self, hunter_type: str):
         self.export_service.export_all_markdown_reports()
-        if hunter_type == "REGULAR":
-            self.export_service.export_available_usernames()
-            self.export_service.export_premium_selection(self.settings.min_score_threshold)
-            self.export_service.export_all_usernames_csv()
-        elif hunter_type == "BOT":
-            self.export_service.export_available_bot_names()
-            self.export_service.export_bot_selection(self.settings.min_score_threshold)
-            self.export_service.export_all_bot_names_csv()
-        else:
-            self.export_service.export_premium_bot_names()
-            self.export_service.export_premium_bot_selection(self.settings.min_score_threshold)
-            self.export_service.export_premium_aliases_csv()
-
         is_ru = (self.settings.language == "ru")
         msg = (
             f"Экспорт успешно завершен!\n\nВсе категории имён сохранены в 7 Markdown (.md) файлов в папке:\n{self.settings.exports_dir}"
@@ -1463,8 +1450,6 @@ class HunterApp(ctk.CTk):
 
     def _export_premium_sel(self, min_score: int):
         self.export_service.export_all_markdown_reports()
-        self.export_service.export_premium_selection(min_score)
-        self.export_service.export_all_usernames_csv()
         is_ru = (self.settings.language == "ru")
         msg = (
             f"Экспорт успешно завершен!\n\nВсе категории имён сохранены в 7 Markdown (.md) файлов в папке:\n{self.settings.exports_dir}"

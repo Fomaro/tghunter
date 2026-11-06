@@ -11,9 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from telegram_username_hunter.analysis.auction_eligibility import (
-    AuctionEligibilityAnalyzer,
-)
 from telegram_username_hunter.analysis.market_analysis import MarketPotentialAnalyzer
 from telegram_username_hunter.analysis.scoring import UsernameScorer
 from telegram_username_hunter.checkers.bot_checker import BotChecker
@@ -22,15 +19,12 @@ from telegram_username_hunter.checkers.premium_bot_checker import PremiumBotChec
 from telegram_username_hunter.checkers.telegram_checker import TelegramChecker
 from telegram_username_hunter.config.settings import (
     AppSettings,
-    AuctionEligibility,
     BotStatus,
     PerformanceMode,
-    PERFORMANCE_PROFILES,
     PremiumBotStatus,
-    UsernameCategory,
     UsernameStatus,
 )
-from telegram_username_hunter.database.database import ALLOWED_SORT_COLUMNS, DatabaseManager
+from telegram_username_hunter.database.database import DatabaseManager
 from telegram_username_hunter.database.models import (
     BotRecord,
     PremiumAliasRecord,
@@ -96,7 +90,7 @@ def test_regression_bot_generation_and_rules():
 
     assert len(batch) == 100
     seen = set()
-    for name, cat in batch:
+    for name, _cat in batch:
         assert 5 <= len(name) <= 32
         assert name.endswith("bot")
         assert name not in seen
@@ -111,7 +105,7 @@ def test_regression_premium_alias_generation_and_rules():
     assert len(batch) == 100
     seen = set()
     valid_suffixes = {"_app", "_ai", "_game", "_agent", "_bot", "_gay"}
-    for name, sfx, cat in batch:
+    for name, sfx, _cat in batch:
         assert 5 <= len(name) <= 32
         assert sfx in valid_suffixes
         assert name.endswith(sfx)
@@ -187,8 +181,8 @@ def test_regression_sqlite_persistence_and_no_locks(regression_env):
     assert db.get_setting("test_key") == "test_val"
 
 
-def test_regression_exports_txt_and_csv_format(regression_env):
-    """Verify export files are strictly categorized and correctly formatted."""
+def test_regression_exports_markdown_format(regression_env):
+    """Verify export files are strictly categorized into 7 Markdown files + all statuses, and no legacy CSV/TXT."""
     _service, db, exporter, settings, exp_path = regression_env
 
     db.upsert_username(UsernameRecord(username="free_un", category="5_chars", status=UsernameStatus.AVAILABLE_TO_CLAIM.value, score=92))
@@ -197,17 +191,21 @@ def test_regression_exports_txt_and_csv_format(regression_env):
 
     exporter.run_all_auto_exports(min_score=70)
 
-    # Free names file must only contain free usernames
-    with open(exp_path / "available_usernames.txt", "r", encoding="utf-8") as f:
+    # Legacy CSV and TXT files must NOT exist
+    assert not (exp_path / "available_usernames.txt").exists()
+    assert not (exp_path / "all_usernames.csv").exists()
+
+    # Free names markdown must only contain free usernames
+    with open(exp_path / "1_available.md", "r", encoding="utf-8") as f:
         content = f.read()
         assert "free_un" in content
         assert "taken_un" not in content
 
-    # CSV must exist and contain headers
-    with open(exp_path / "all_usernames.csv", "r", encoding="utf-8") as f:
-        csv_header = f.readline()
-        assert "username" in csv_header
-        assert "status" in csv_header
+    # Occupied names markdown must contain taken usernames
+    with open(exp_path / "3_occupied.md", "r", encoding="utf-8") as f:
+        content = f.read()
+        assert "taken_un" in content
+        assert "free_un" not in content
 
 
 # 4. PERFORMANCE MODES & DYNAMIC CONTROLS REGRESSION TESTS

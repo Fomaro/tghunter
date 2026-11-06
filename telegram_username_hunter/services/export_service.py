@@ -1,21 +1,20 @@
 """
-Telegram Username Hunter PRO
-Export Service (Markdown .md, TXT & CSV)
-Saves results into 7 specialized Markdown reports corresponding to all username status types:
+Telegram Username Hunter PRO v2.0.0
+Export Service (Pure Markdown .md Reports)
+Strictly exports results into 7 specialized Markdown reports plus 1 master registry:
 1. 1_available.md (Свободные / AVAILABLE)
 2. 2_fragment_purchase.md (Можно купить на Fragment / PURCHASE_AVAILABLE)
 3. 3_occupied.md (Занятые / OCCUPIED)
-4. 4_restricted.md (Ограниченные / RESTRICTED)
+4. 4_restricted.md (Ограниченные системной политикой / RESTRICTED)
 5. 5_invalid.md (Недействительные / INVALID)
 6. 6_unknown.md (Не проверено / UNKNOWN)
-7. 7_errors.md (Ошибки / ERROR)
+7. 7_errors.md (Ошибки проверки / ERROR)
 + 8_all_statuses.md (Все статусы / ALL)
 """
+import csv
 import logging
 from datetime import datetime
 from pathlib import Path
-
-import pandas as pd
 
 from telegram_username_hunter.config.i18n import (
     format_availability_status,
@@ -57,7 +56,7 @@ def _generate_markdown_report(
         f"> 📊 **Категория статуса:** `{status_label}`  \n"
         f"> 🔢 **Всего записей:** `{total_count}` (Юзернеймы: {len(usernames)}, Боты: {len(bots_list)}, Премиум алиасы: {len(aliases_list)})  \n"
         f"> 🕒 **Дата экспорта:** `{now_str}`  \n"
-        f"> 🛡️ **Экспортер:** `Telegram Username Hunter PRO`\n"
+        f"> 🛡️ **Экспортер:** `Telegram Username Hunter PRO v2.0`\n"
     )
     md.append("---\n")
 
@@ -131,7 +130,7 @@ def _generate_markdown_report(
 
 
 class ExportService:
-    """Handles automatic and on-demand file exports to Markdown (.md), TXT, and CSV."""
+    """Handles structured file exports exclusively to Markdown (.md) reports."""
 
     def __init__(self, db: DatabaseManager, export_dir: Path | None = None):
         self.db = db
@@ -145,14 +144,16 @@ class ExportService:
         logger.info(f"Exported {filename} to {out_path}")
         return out_path
 
-    def _write_lines(self, filename: str, lines: list[str]) -> Path:
-        out_path = self.export_dir / filename
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.writelines(f"{line}\n" for line in lines)
-        logger.info(f"Exported {len(lines)} lines to {out_path}")
-        return out_path
+    def _clean_legacy_exports(self) -> None:
+        """Removes legacy .csv and .txt files to keep exports directory clean."""
+        for pattern in ("*.csv", "*.txt", "available.md", "occupied.md", "fragment_purchase.md", "restricted.md", "invalid.md", "unknown.md", "errors.md", "all_statuses.md"):
+            for f in self.export_dir.glob(pattern):
+                try:
+                    f.unlink()
+                except Exception as e:
+                    logger.debug("Could not delete legacy file %s: %s", f, e)
 
-    # ================= MARKDOWN (.MD) EXPORTS =================
+    # ================= 7 SPECIALIZED MARKDOWN (.MD) EXPORTS =================
 
     def export_markdown_available(self) -> Path:
         """1. Export AVAILABLE usernames (excluding Fragment purchases)."""
@@ -168,7 +169,6 @@ class ExportService:
             bots=bots,
             aliases=aliases,
         )
-        self._write_file("available.md", content)
         return self._write_file("1_available.md", content)
 
     def export_markdown_fragment_purchase(self) -> Path:
@@ -184,7 +184,6 @@ class ExportService:
             bots=bots,
             aliases=aliases,
         )
-        self._write_file("fragment_purchase.md", content)
         return self._write_file("2_fragment_purchase.md", content)
 
     def export_markdown_occupied(self) -> Path:
@@ -200,7 +199,6 @@ class ExportService:
             bots=bots,
             aliases=aliases,
         )
-        self._write_file("occupied.md", content)
         return self._write_file("3_occupied.md", content)
 
     def export_markdown_restricted(self) -> Path:
@@ -217,7 +215,6 @@ class ExportService:
             bots=bots,
             aliases=aliases,
         )
-        self._write_file("restricted.md", content)
         return self._write_file("4_restricted.md", content)
 
     def export_markdown_invalid(self) -> Path:
@@ -233,7 +230,6 @@ class ExportService:
             bots=bots,
             aliases=aliases,
         )
-        self._write_file("invalid.md", content)
         return self._write_file("5_invalid.md", content)
 
     def export_markdown_unknown(self) -> Path:
@@ -249,7 +245,6 @@ class ExportService:
             bots=bots,
             aliases=aliases,
         )
-        self._write_file("unknown.md", content)
         return self._write_file("6_unknown.md", content)
 
     def export_markdown_errors(self) -> Path:
@@ -265,7 +260,6 @@ class ExportService:
             bots=bots,
             aliases=aliases,
         )
-        self._write_file("errors.md", content)
         return self._write_file("7_errors.md", content)
 
     def export_markdown_all_statuses(self) -> Path:
@@ -281,14 +275,14 @@ class ExportService:
             bots=bots,
             aliases=aliases,
         )
-        self._write_file("all_statuses.md", content)
         return self._write_file("8_all_statuses.md", content)
 
     def export_all_markdown_reports(self) -> dict[str, Path]:
         """
         Executes generation of all 7 category Markdown (.md) reports plus full registry.
-        Returns dict of {filename: Path}.
+        Removes any leftover legacy .csv or .txt files.
         """
+        self._clean_legacy_exports()
         return {
             "1_available.md": self.export_markdown_available(),
             "2_fragment_purchase.md": self.export_markdown_fragment_purchase(),
@@ -300,117 +294,35 @@ class ExportService:
             "8_all_statuses.md": self.export_markdown_all_statuses(),
         }
 
-    # ================= TXT EXPORTS (BACKWARD COMPATIBILITY) =================
+    def run_all_auto_exports(self, min_score: int = 70) -> dict[str, Path]:
+        """Automated export pipeline saving exclusively clean Markdown (.md) reports."""
+        return self.export_all_markdown_reports()
+
+    # ================= COMPATIBILITY HELPERS (STANDALONE USE) =================
 
     def export_available_usernames(self) -> Path:
-        """Export confirmed available regular usernames."""
+        """Standalone helper for plain text export if invoked explicitly."""
         records = self.db.get_usernames(limit=50000, status=UsernameStatus.AVAILABLE.value)
-        lines = [r.username for r in records]
-        return self._write_lines("available_usernames.txt", lines)
+        out_path = self.export_dir / "available_usernames.txt"
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.writelines(f"{r.username}\n" for r in records)
+        return out_path
 
     def export_premium_selection(self, min_score: int = 70) -> Path:
-        """Export confirmed available regular usernames with score >= min_score."""
-        records = self.db.get_usernames(
-            limit=50000,
-            status=UsernameStatus.AVAILABLE.value,
-            min_score=min_score,
-            sort_by="score"
-        )
-        lines = [f"{r.username} (score: {r.score}, length: {r.length}, cat: {r.category})" for r in records]
-        return self._write_lines("premium_selection.txt", lines)
-
-    def export_available_bot_names(self) -> Path:
-        """Export confirmed available bot usernames."""
-        records = self.db.get_bots(limit=50000, status=BotStatus.AVAILABLE.value)
-        lines = [r.username for r in records]
-        return self._write_lines("available_bot_names.txt", lines)
-
-    def export_bot_selection(self, min_score: int = 70) -> Path:
-        """Export confirmed available bot usernames with score >= min_score."""
-        records = self.db.get_bots(
-            limit=50000,
-            status=BotStatus.AVAILABLE.value,
-            min_score=min_score,
-            sort_by="score"
-        )
-        lines = [f"{r.username} (score: {r.score}, length: {r.length}, cat: {r.category})" for r in records]
-        return self._write_lines("bot_selection.txt", lines)
-
-    def export_premium_bot_names(self) -> Path:
-        """Export eligible premium bot aliases."""
-        records = self.db.get_premium_aliases(limit=50000, status=PremiumBotStatus.AVAILABLE.value)
-        lines = [r.username for r in records]
-        return self._write_lines("premium_bot_names.txt", lines)
-
-    def export_premium_bot_selection(self, min_score: int = 70) -> Path:
-        """Export eligible premium bot aliases with score >= min_score."""
-        records = self.db.get_premium_aliases(
-            limit=50000,
-            status=PremiumBotStatus.AVAILABLE.value,
-            min_score=min_score,
-            sort_by="score"
-        )
-        lines = [f"{r.username} (score: {r.score}, length: {r.length}, cat: {r.category})" for r in records]
-        return self._write_lines("premium_bot_selection.txt", lines)
-
-    def export_unknown_names(self) -> Path:
-        """Export names with UNKNOWN status for future re-checking."""
-        un_unknown = [r.username for r in self.db.get_usernames(limit=50000, status=UsernameStatus.UNKNOWN.value)]
-        bot_unknown = [r.username for r in self.db.get_bots(limit=50000, status=BotStatus.UNKNOWN.value)]
-        alias_unknown = [r.username for r in self.db.get_premium_aliases(limit=50000, status=PremiumBotStatus.UNKNOWN.value)]
-
-        lines = sorted(list(set(un_unknown + bot_unknown + alias_unknown)))
-        return self._write_lines("unknown_names.txt", lines)
-
-    # ================= CSV EXPORTS (BACKWARD COMPATIBILITY) =================
+        """Standalone helper for plain text selection if invoked explicitly."""
+        records = self.db.get_usernames(limit=50000, status=UsernameStatus.AVAILABLE.value, min_score=min_score, sort_by="score")
+        out_path = self.export_dir / "premium_selection.txt"
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.writelines(f"{r.username} (score: {r.score}, length: {r.length}, cat: {r.category})\n" for r in records)
+        return out_path
 
     def export_all_usernames_csv(self) -> Path:
+        """Standalone helper for CSV format if invoked explicitly without pandas."""
         records = self.db.get_usernames(limit=100000)
-        df = pd.DataFrame([r.to_dict() for r in records])
         out_path = self.export_dir / "all_usernames.csv"
-        df.to_csv(out_path, index=False, encoding="utf-8-sig")
+        with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(["username", "category", "status", "score", "auction_eligibility", "fragment_url", "last_checked_at", "check_source", "notes"])
+            for r in records:
+                writer.writerow([r.username, r.category, r.status, r.score, r.auction_eligibility, r.fragment_url, r.last_checked_at, r.check_source, r.notes])
         return out_path
-
-    def export_all_bot_names_csv(self) -> Path:
-        records = self.db.get_bots(limit=100000)
-        df = pd.DataFrame([r.to_dict() for r in records])
-        out_path = self.export_dir / "all_bot_names.csv"
-        df.to_csv(out_path, index=False, encoding="utf-8-sig")
-        return out_path
-
-    def export_premium_aliases_csv(self) -> Path:
-        records = self.db.get_premium_aliases(limit=100000)
-        df = pd.DataFrame([r.to_dict() for r in records])
-        out_path = self.export_dir / "premium_aliases.csv"
-        df.to_csv(out_path, index=False, encoding="utf-8-sig")
-        return out_path
-
-    def export_auction_eligible_csv(self) -> Path:
-        records = self.db.get_usernames(limit=100000)
-        eligible = [
-            r.to_dict()
-            for r in records
-            if r.auction_eligibility in (
-                AuctionEligibility.AUCTION_SUPPORTED.value,
-                AuctionEligibility.PURCHASE_AVAILABLE.value,
-            )
-        ]
-        df = pd.DataFrame(eligible)
-        out_path = self.export_dir / "auction_eligible.csv"
-        df.to_csv(out_path, index=False, encoding="utf-8-sig")
-        return out_path
-
-    def run_all_auto_exports(self, min_score: int = 70) -> None:
-        """Run all auto-export routines including Markdown reports."""
-        self.export_all_markdown_reports()
-        self.export_available_usernames()
-        self.export_premium_selection(min_score)
-        self.export_available_bot_names()
-        self.export_bot_selection(min_score)
-        self.export_premium_bot_names()
-        self.export_premium_bot_selection(min_score)
-        self.export_unknown_names()
-        self.export_all_usernames_csv()
-        self.export_all_bot_names_csv()
-        self.export_premium_aliases_csv()
-        self.export_auction_eligible_csv()

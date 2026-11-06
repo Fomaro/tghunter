@@ -2,7 +2,7 @@
 ; Telegram Username Hunter PRO Windows Installer
 
 #define MyAppName "Telegram Username Hunter"
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "Fomaro"
 #define MyAppURL "https://github.com/Fomaro/tghunter"
 #define MyAppExeName "TelegramUsernameHunterPRO.exe"
@@ -19,7 +19,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=..\..\dist
-OutputBaseFilename=TelegramUsernameHunter_Setup_v1.0.3
+OutputBaseFilename=TelegramUsernameHunter_Setup_v2.0.0
 SetupIconFile=..\..\assets\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

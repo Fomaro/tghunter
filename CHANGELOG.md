@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-11-06 (Major Release v2)
+
+### Changed
+- **Pure Markdown Multi-Category Export System**: Completely eliminated legacy `.csv` and `.txt` file generation. All exported data is now organized strictly into 7 categorized GitHub-Flavored Markdown reports plus a complete master registry:
+  - `1_available.md` (Свободные / AVAILABLE)
+  - `2_fragment_purchase.md` (Можно купить на Fragment / PURCHASE_AVAILABLE)
+  - `3_occupied.md` (Занятые / OCCUPIED)
+  - `4_restricted.md` (Ограниченные системной политикой / RESTRICTED)
+  - `5_invalid.md` (Недействительные / INVALID)
+  - `6_unknown.md` (Не проверено / UNKNOWN)
+  - `7_errors.md` (Ошибки проверки / ERROR)
+  - `8_all_statuses.md` (Полный реестр всех статусов)
+- **Automatic Legacy Cleanup**: Automatic removal of old `.csv` and `.txt` files from `exports/` folder when exports are triggered, keeping workspace directories clean and organized.
+- **Direct Link Previews & Code Blocks**: All reports feature clickable hyperlinks to `t.me/<username>` and `fragment.com/username/<username>`, structured markdown tables, and batch `@username` code blocks ready for instant copy-pasting.
+- **Optimized Dependencies**: Removed Pandas from active export flow, utilizing lightweight native formatting for maximal export speed and zero memory overhead.
+
+### Fixed
+- **Export Clutter**: Addressed user-reported clutter where CSV and TXT files were generated alongside Markdown files.
+
 ## [1.0.3] - 2026-11-06
 
 ### Added

@@ -3,20 +3,19 @@ Telegram Username Hunter PRO
 Automated Test Suite: Username Availability & MTProto Verification
 Verifies all 12 core requirements from the Telegram Username Availability Audit specification.
 """
-import pytest
-import httpx
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
+from telegram_username_hunter.checkers.fragment_checker import FragmentChecker
 from telegram_username_hunter.checkers.mtproto_checker import (
     MockMTProtoClient,
     MTProtoClientInterface,
     MTProtoErrorCode,
     MTProtoRPCError,
     TargetEntityType,
-    TELEGRAM_RESTRICTED_WORDS,
 )
 from telegram_username_hunter.checkers.telegram_checker import TelegramChecker
-from telegram_username_hunter.checkers.fragment_checker import FragmentChecker
 from telegram_username_hunter.config.settings import AuctionEligibility, UsernameStatus
 from telegram_username_hunter.services.rate_limiter import RateLimiter
 

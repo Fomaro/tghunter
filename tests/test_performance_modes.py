@@ -5,7 +5,6 @@ Comprehensive Performance Modes & Adaptive Load Management Tests
 import asyncio
 import gc
 import tempfile
-import time
 from pathlib import Path
 
 import psutil
@@ -14,7 +13,6 @@ import pytest
 from telegram_username_hunter.config.settings import (
     AppSettings,
     PerformanceMode,
-    PERFORMANCE_PROFILES,
     UsernameCategory,
 )
 from telegram_username_hunter.database.database import DatabaseManager

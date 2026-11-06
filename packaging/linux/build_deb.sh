@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "=== Building Debian Package (.deb) for Telegram Username Hunter ==="
 
-VERSION="1.0.3"
+VERSION="2.0.0"
 ARCH="amd64"
 PKG_DIR="dist/deb_pkg"
 BUILD_DIR="${PKG_DIR}/telegram-username-hunter_${VERSION}_${ARCH}"

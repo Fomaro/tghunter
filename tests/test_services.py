@@ -117,6 +117,28 @@ def test_export_service_files_generated(test_env):
     # Run auto exports
     exporter.run_all_auto_exports(min_score=70)
 
+    # Markdown reports verification
+    md_reports = exporter.export_all_markdown_reports()
+    assert (exp_path / "1_available.md").exists()
+    assert (exp_path / "2_fragment_purchase.md").exists()
+    assert (exp_path / "3_occupied.md").exists()
+    assert (exp_path / "4_restricted.md").exists()
+    assert (exp_path / "5_invalid.md").exists()
+    assert (exp_path / "6_unknown.md").exists()
+    assert (exp_path / "7_errors.md").exists()
+    assert (exp_path / "8_all_statuses.md").exists()
+
+    with open(exp_path / "1_available.md", "r", encoding="utf-8") as f:
+        avail_md = f.read()
+        assert "avail1" in avail_md
+        assert "taken1" not in avail_md
+        assert "## 👤 Юзернеймы Telegram" in avail_md
+
+    with open(exp_path / "3_occupied.md", "r", encoding="utf-8") as f:
+        occ_md = f.read()
+        assert "taken1" in occ_md
+        assert "avail1" not in occ_md
+
     # Check that expected files are created
     assert (exp_path / "available_usernames.txt").exists()
     assert (exp_path / "premium_selection.txt").exists()

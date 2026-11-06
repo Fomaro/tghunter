@@ -5,7 +5,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/Fomaro/tghunter)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/release-v1.0.2-emerald.svg)](https://github.com/Fomaro/tghunter/releases)
+[![Latest Release](https://img.shields.io/badge/release-v1.0.3-emerald.svg)](https://github.com/Fomaro/tghunter/releases)
 
 A high-performance desktop application for automated discovery, availability verification, valuation scoring, and auction monitoring of Telegram usernames, bot handles, and premium aliases. Built with Python 3.12, CustomTkinter, Asyncio, and SQLite WAL mode.
 

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.3] - 2026-11-06
+
+### Added
+- **Structured Markdown (.md) Multi-Category Export System**: Export engine now generates 7 dedicated Markdown reports matching all status categories from the selector plus errors and full registry:
+  - `1_available.md` (Свободные / AVAILABLE)
+  - `2_fragment_purchase.md` (Можно купить на Fragment / PURCHASE_AVAILABLE)
+  - `3_occupied.md` (Занятые / OCCUPIED)
+  - `4_restricted.md` (Ограниченные системной политикой / RESTRICTED)
+  - `5_invalid.md` (Недействительные / INVALID)
+  - `6_unknown.md` (Не проверено / UNKNOWN)
+  - `7_errors.md` (Ошибки проверки / ERROR)
+  - `8_all_statuses.md` (Полный реестр всех статусов)
+- **Interactive Markdown Features**: Each `.md` report contains rich GitHub-flavored markdown tables with clickable links to Telegram profiles (`t.me/<name>`) and Fragment pages (`fragment.com/username/<name>`), detailed status breakdowns, scores, lengths, and a dedicated quick-copy block (`@username`) for batch workflows.
+- **Automatic Folder Opening**: UI export triggers now automatically open the `exports/` folder in the OS file manager upon completion.
+
+### Fixed
+- **Selective Export Limitations**: Fixed previous export behavior that only generated plain `.txt` and `.csv` files for high-score names, enabling complete categorization for all statuses and error tracking.
+
 ## [1.0.2] - 2026-11-06
 
 ### Added

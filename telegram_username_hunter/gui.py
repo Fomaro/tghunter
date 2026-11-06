@@ -1438,6 +1438,7 @@ class HunterApp(ctk.CTk):
             self.worker.submit(self.search_service.run_premium_bot_hunter(count=count))
 
     def _trigger_export(self, hunter_type: str):
+        self.export_service.export_all_markdown_reports()
         if hunter_type == "REGULAR":
             self.export_service.export_available_usernames()
             self.export_service.export_premium_selection(self.settings.min_score_threshold)
@@ -1451,12 +1452,27 @@ class HunterApp(ctk.CTk):
             self.export_service.export_premium_bot_selection(self.settings.min_score_threshold)
             self.export_service.export_premium_aliases_csv()
 
-        messagebox.showinfo("Export Complete", f"{self._t('msg_export_complete')}{self.settings.exports_dir}")
+        is_ru = (self.settings.language == "ru")
+        msg = (
+            f"Экспорт успешно завершен!\n\nВсе категории имён сохранены в 7 Markdown (.md) файлов в папке:\n{self.settings.exports_dir}"
+            if is_ru else
+            f"Export Complete!\n\nAll name categories saved into 7 Markdown (.md) reports in folder:\n{self.settings.exports_dir}"
+        )
+        messagebox.showinfo("Export Complete", msg)
+        self._open_exports_folder()
 
     def _export_premium_sel(self, min_score: int):
+        self.export_service.export_all_markdown_reports()
         self.export_service.export_premium_selection(min_score)
         self.export_service.export_all_usernames_csv()
-        messagebox.showinfo("Exported", f"{self._t('msg_export_complete')}{self.settings.exports_dir / 'premium_selection.txt'}")
+        is_ru = (self.settings.language == "ru")
+        msg = (
+            f"Экспорт успешно завершен!\n\nВсе категории имён сохранены в 7 Markdown (.md) файлов в папке:\n{self.settings.exports_dir}"
+            if is_ru else
+            f"Export Complete!\n\nAll name categories saved into 7 Markdown (.md) reports in folder:\n{self.settings.exports_dir}"
+        )
+        messagebox.showinfo("Export Complete", msg)
+        self._open_exports_folder()
 
     def _open_exports_folder(self):
         """Open exports directory in system file manager."""

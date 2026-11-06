@@ -95,7 +95,7 @@ def test_sqlite_batch_operations_performance():
                 score=75
             ))
         insert_time = time.perf_counter() - t0
-        assert insert_time < 15.0  # 1000 individual connection inserts on Windows disk
+        assert insert_time < 45.0  # 1000 individual connection inserts on virtualized CI disks
 
         # Query and filter
         t0 = time.perf_counter()

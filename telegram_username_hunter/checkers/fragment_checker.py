@@ -127,26 +127,32 @@ class FragmentChecker:
                     title_str = og_title_m[0].lower() if og_title_m else ""
                     desc_str = og_desc_m[0].lower() if og_desc_m else ""
 
-                    is_sold = ("sold for" in text_lower) or ("sold" in title_str) or ("sold" in desc_str) or ("status-sold" in text_lower)
-                    is_auction = ("in auction" in text_lower) or ("auction" in title_str) or ("auction" in desc_str) or ("buy @" in title_str)
-                    is_taken = ("is taken" in desc_str) or ("make an offer" in title_str) or ("unavailable" in text_lower)
-                    is_available = ("available" in text_lower and not is_taken) or ("put up for auction" in text_lower)
+                    # Fragment official status badges:
+                    # <span class="tm-section-header-status tm-status-taken">Taken</span>
+                    # <span class="tm-section-header-status tm-status-sold">Sold</span>
+                    # <span class="tm-section-header-status tm-status-unavail">Unavailable</span>
+                    # <span class="tm-section-header-status tm-status-avail">On auction / Available</span>
+                    has_badge_taken = "tm-status-taken" in text_lower or "status-taken" in text_lower or "is taken" in desc_str or "is taken" in text_lower
+                    has_badge_sold = "tm-status-sold" in text_lower or "status-sold" in text_lower or "sold for" in text_lower or "sold for" in desc_str
+                    has_badge_unavail = "tm-status-unavail" in text_lower or "status-unavail" in text_lower
+                    has_badge_avail = "tm-status-avail" in text_lower or "status-avail" in text_lower or ("in auction" in text_lower)
 
-                    if is_sold:
+                    if has_badge_taken:
+                        status = "taken"
+                        is_collectible = False
+                        exists = True
+                    elif has_badge_sold:
                         status = "sold"
                         is_collectible = True
                         exists = True
-                    elif is_auction:
-                        status = "in_auction"
-                        is_collectible = True
-                        exists = True
-                    elif is_available:
-                        status = "available"
-                        is_collectible = True
-                        exists = True
-                    elif is_taken:
-                        status = "taken"
+                    elif has_badge_unavail:
+                        status = "unavailable"
                         is_collectible = False
+                        exists = True
+                    elif has_badge_avail:
+                        is_auction = ("in auction" in text_lower) or ("auction" in title_str) or ("auction" in desc_str) or ("buy @" in title_str)
+                        status = "in_auction" if is_auction else "available"
+                        is_collectible = True
                         exists = True
                     else:
                         status = "not_found"

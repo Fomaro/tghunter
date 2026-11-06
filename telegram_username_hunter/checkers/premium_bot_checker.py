@@ -63,7 +63,7 @@ class PremiumBotChecker:
 
         # 2. Fragment check
         fragment_res = await self.fragment_checker.check_fragment(clean_name)
-        if fragment_res.get("exists_on_fragment") and fragment_res.get("status") in ("sold", "in_auction", "taken"):
+        if fragment_res.get("exists_on_fragment") and fragment_res.get("status") in ("sold", "in_auction", "taken", "unavailable"):
             return PremiumBotStatus.ALREADY_ASSIGNED, {
                 "source": "fragment",
                 "details": f"Alias is registered or occupied on Fragment ({fragment_res.get('status')})",
@@ -100,85 +100,111 @@ class PremiumBotChecker:
 
         # 4. Live t.me endpoint check
         url = f"{self.TELEGRAM_BASE_URL}/{clean_name}"
-        await self.rate_limiter.acquire()
+        max_attempts = 2
+        last_error_details = ""
 
-        url = f"{self.TELEGRAM_BASE_URL}/{clean_name}"
-        await self.rate_limiter.acquire()
+        for attempt in range(1, max_attempts + 1):
+            await self.rate_limiter.acquire()
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
+                    resp = await client.get(url, headers=self.headers)
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                resp = await client.get(url, headers=self.headers)
+                    if resp.status_code == 429:
+                        retry_after = float(resp.headers.get("Retry-After", 30))
+                        self.rate_limiter.record_error(is_rate_limit=True, retry_after=retry_after)
+                        return PremiumBotStatus.UNKNOWN, {
+                            "source": "tme",
+                            "details": "Telegram FloodWait 429. Final check pending.",
+                            "fragment_data": fragment_res
+                        }
 
-                if resp.status_code == 429:
-                    retry_after = float(resp.headers.get("Retry-After", 30))
-                    self.rate_limiter.record_error(is_rate_limit=True, retry_after=retry_after)
-                    return PremiumBotStatus.UNKNOWN, {
-                        "source": "tme",
-                        "details": "Telegram FloodWait 429. Final check pending.",
-                        "fragment_data": fragment_res
-                    }
+                    if resp.status_code in (404, 302):
+                        self.rate_limiter.record_success()
+                        return PremiumBotStatus.ELIGIBLE_FOR_ASSIGNMENT, {
+                            "source": "tme",
+                            "details": "Namespace unoccupied. Final assignment subject to Telegram bot settings.",
+                            "fragment_data": fragment_res
+                        }
 
-                if resp.status_code in (404, 302):
-                    self.rate_limiter.record_success()
-                    return PremiumBotStatus.ELIGIBLE_FOR_ASSIGNMENT, {
-                        "source": "tme",
-                        "details": "Namespace unoccupied. Final assignment subject to Telegram bot settings.",
-                        "fragment_data": fragment_res
-                    }
+                    if resp.status_code == 200:
+                        self.rate_limiter.record_success()
+                        text = resp.text
+                        text_lower = text.lower()
 
-                if resp.status_code == 200:
-                    self.rate_limiter.record_success()
-                    text = resp.text
+                        has_title = 'class="tgme_page_title"' in text
+                        has_extra = 'class="tgme_page_extra"' in text
+                        has_photo = 'class="tgme_page_photo' in text or 'tgme_page_photo_image' in text
+                        has_desc = 'class="tgme_page_description"' in text
 
-                    # Signatures of free unclaimed namespaces on t.me
-                    is_free = 'class="tgme_page_description"' in text and (
-                        "if you have" in text.lower() and "you can contact" in text.lower()
-                    )
-                    if is_free:
+                        is_free_phrase = any(
+                            p in text_lower for p in [
+                                "if you have", "you can contact", "right away",
+                                "если у вас есть", "вы можете связаться", "прямо сейчас",
+                                "si tienes telegram", "puedes contactar",
+                                "wenn sie telegram haben", "können sie"
+                            ]
+                        )
+
+                        is_free = (
+                            (has_desc and is_free_phrase and not has_title and not has_photo)
+                            or (has_desc and ('class="tgme_username_link"' in text or 'tgme_icon_user' in text) and not has_title and not has_photo)
+                            or (not has_title and not has_extra and not has_photo and (fragment_res.get("status") == "not_found" or not fragment_res.get("exists_on_fragment")))
+                        )
+                        if is_free:
+                            return PremiumBotStatus.ELIGIBLE_FOR_ASSIGNMENT, {
+                                "source": "tme_and_fragment",
+                                "details": "Public endpoints show unassigned. Final confirmation is executed when linking alias to bot in Telegram.",
+                                "fragment_data": fragment_res
+                            }
+
+                        has_action_btn = 'class="tgme_action_button_new"' in text or 'class="tgme_page_action"' in text
+
+                        if has_title or has_extra or has_photo or (has_action_btn and not has_desc):
+                            return PremiumBotStatus.ALREADY_ASSIGNED, {
+                                "source": "tme",
+                                "details": "Alias is already occupied and attached to an existing bot or channel.",
+                                "fragment_data": fragment_res
+                            }
+
                         return PremiumBotStatus.ELIGIBLE_FOR_ASSIGNMENT, {
                             "source": "tme_and_fragment",
                             "details": "Public endpoints show unassigned. Final confirmation is executed when linking alias to bot in Telegram.",
                             "fragment_data": fragment_res
                         }
 
-                    has_title = 'class="tgme_page_title"' in text
-                    has_extra = 'class="tgme_page_extra"' in text
-                    has_photo = 'class="tgme_page_photo' in text
-                    has_action_btn = 'class="tgme_action_button_new"' in text or 'class="tgme_page_action"' in text
-
-                    if has_title or has_extra or has_photo or has_action_btn:
-                        return PremiumBotStatus.ALREADY_ASSIGNED, {
+                    else:
+                        if attempt < max_attempts and resp.status_code in (500, 502, 503, 504):
+                            await asyncio.sleep(0.3)
+                            continue
+                        self.rate_limiter.record_error()
+                        return PremiumBotStatus.ERROR, {
                             "source": "tme",
-                            "details": "Alias is already occupied and attached to an existing bot or channel.",
+                            "details": f"HTTP status error: {resp.status_code}",
                             "fragment_data": fragment_res
                         }
 
-                    # If not found on Fragment and no active profile on t.me
-                    return PremiumBotStatus.ELIGIBLE_FOR_ASSIGNMENT, {
-                        "source": "tme_and_fragment",
-                        "details": "Public endpoints show unassigned. Final confirmation is executed when linking alias to bot in Telegram.",
-                        "fragment_data": fragment_res
-                    }
+            except (httpx.TimeoutException, httpx.NetworkError) as e:
+                last_error_details = str(e)
+                if attempt < max_attempts:
+                    await asyncio.sleep(0.3)
+                    continue
+                self.rate_limiter.record_error()
+                is_timeout = isinstance(e, httpx.TimeoutException) or "timed out" in last_error_details.lower()
+                return PremiumBotStatus.ERROR, {
+                    "source": "tme",
+                    "details": "HTTP request timed out" if is_timeout else f"Network exception: {last_error_details}",
+                    "fragment_data": fragment_res
+                }
+            except Exception as e:
+                self.rate_limiter.record_error()
+                return PremiumBotStatus.ERROR, {
+                    "source": "tme",
+                    "details": f"Network exception: {e!s}",
+                    "fragment_data": fragment_res
+                }
 
-                else:
-                    self.rate_limiter.record_error()
-                    return PremiumBotStatus.ERROR, {
-                        "source": "tme",
-                        "details": f"HTTP status error: {resp.status_code}",
-                        "fragment_data": fragment_res
-                    }
-
-        except httpx.TimeoutException:
-            self.rate_limiter.record_error()
-            return PremiumBotStatus.ERROR, {
-                "source": "tme",
-                "details": "HTTP request timed out",
-                "fragment_data": fragment_res
-            }
-        except Exception as e:
-            self.rate_limiter.record_error()
-            return PremiumBotStatus.ERROR, {
-                "source": "tme",
-                "details": f"Network exception: {e!s}",
-                "fragment_data": fragment_res
-            }
+        return PremiumBotStatus.ERROR, {
+            "source": "tme",
+            "details": last_error_details or "Request failed without response",
+            "fragment_data": fragment_res
+        }

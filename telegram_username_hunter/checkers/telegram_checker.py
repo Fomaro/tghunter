@@ -18,6 +18,18 @@ from telegram_username_hunter.services.rate_limiter import RateLimiter
 logger = logging.getLogger(__name__)
 
 
+TELEGRAM_SYSTEM_RESERVED = {
+    "admin", "administrator", "root", "support", "help", "service", "security",
+    "telegram", "durov", "channel", "group", "contact", "settings", "privacy",
+    "terms", "wallet", "status", "update", "updates", "news", "official", "system",
+    "verify", "verification", "moderator", "staff", "founder", "ceo", "fragment",
+    "ton", "blockchain", "premium", "stickers", "themes", "proxy", "desktop",
+    "web", "android", "ios", "login", "auth", "oauth", "token", "connect",
+    "account", "profile", "notification", "notifications", "alerts", "securitybot",
+    "spam", "spambot", "botfather", "cloud"
+}
+
+
 class TelegramChecker:
     """Verifies regular Telegram usernames via t.me and Fragment endpoints."""
 
@@ -58,7 +70,7 @@ class TelegramChecker:
                 "details": "Username fails Telegram format requirements (5-32 chars, a-z0-9_, no double __)"
             }
 
-        # 2. Check Fragment first for collectibles
+        # 2. Check Fragment first for collectibles or taken status
         fragment_res = await self.fragment_checker.check_fragment(clean_name)
         if fragment_res.get("is_collectible"):
             return UsernameStatus.COLLECTIBLE, {
@@ -66,8 +78,22 @@ class TelegramChecker:
                 "details": f"Collectible username registered on Fragment ({fragment_res.get('status')})",
                 "fragment_data": fragment_res
             }
+        if fragment_res.get("exists_on_fragment") and fragment_res.get("status") in ("taken", "unavailable"):
+            return UsernameStatus.TAKEN, {
+                "source": "fragment",
+                "details": f"Username is occupied/unavailable on Fragment ({fragment_res.get('status')})",
+                "fragment_data": fragment_res
+            }
 
-        # 3. Mock mode check
+        # 3. Check system reserved handles
+        if clean_name in TELEGRAM_SYSTEM_RESERVED:
+            return UsernameStatus.RESERVED, {
+                "source": "system_policy",
+                "details": f"Username '{clean_name}' is reserved by Telegram or official systems.",
+                "fragment_data": fragment_res
+            }
+
+        # 4. Mock mode check
         if self.mock_mode:
             await asyncio.sleep(0.05)
             if clean_name.startswith("taken") or clean_name in ("admin", "telegram", "durov"):
@@ -102,90 +128,124 @@ class TelegramChecker:
                 }
 
         url = f"{self.TELEGRAM_BASE_URL}/{clean_name}"
-        await self.rate_limiter.acquire()
+        max_attempts = 2
+        last_error_details = ""
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                resp = await client.get(url, headers=self.headers)
+        for attempt in range(1, max_attempts + 1):
+            await self.rate_limiter.acquire()
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
+                    resp = await client.get(url, headers=self.headers)
 
-                if resp.status_code == 429:
-                    retry_after = float(resp.headers.get("Retry-After", 30))
-                    self.rate_limiter.record_error(is_rate_limit=True, retry_after=retry_after)
-                    return UsernameStatus.UNKNOWN, {
-                        "source": "tme",
-                        "details": f"Telegram FloodWait 429. Retry after {retry_after}s",
-                        "fragment_data": fragment_res
-                    }
+                    if resp.status_code == 429:
+                        retry_after = float(resp.headers.get("Retry-After", 30))
+                        self.rate_limiter.record_error(is_rate_limit=True, retry_after=retry_after)
+                        return UsernameStatus.UNKNOWN, {
+                            "source": "tme",
+                            "details": f"Telegram FloodWait 429. Retry after {retry_after}s",
+                            "fragment_data": fragment_res
+                        }
 
-                if resp.status_code in (404, 302):
-                    self.rate_limiter.record_success()
-                    return UsernameStatus.AVAILABLE_TO_CLAIM, {
-                        "source": "tme",
-                        "details": f"Telegram returned HTTP {resp.status_code} (Resource not found). Free to claim.",
-                        "fragment_data": fragment_res
-                    }
-
-                if resp.status_code == 200:
-                    self.rate_limiter.record_success()
-                    text = resp.text
-
-                    # Signatures of free unclaimed namespaces on t.me
-                    is_free = 'class="tgme_page_description"' in text and (
-                        "if you have" in text.lower() and "you can contact" in text.lower()
-                    )
-                    if is_free:
+                    if resp.status_code in (404, 302):
+                        self.rate_limiter.record_success()
                         return UsernameStatus.AVAILABLE_TO_CLAIM, {
                             "source": "tme",
-                            "details": "Empty profile placeholder on t.me. Available to claim.",
+                            "details": f"Telegram returned HTTP {resp.status_code} (Resource not found). Free to claim.",
                             "fragment_data": fragment_res
                         }
 
-                    # Signatures of existing active profiles on t.me
-                    has_title = 'class="tgme_page_title"' in text
-                    has_extra = 'class="tgme_page_extra"' in text
-                    has_photo = 'class="tgme_page_photo' in text
-                    has_action_btn = 'class="tgme_action_button_new"' in text or 'class="tgme_page_action"' in text
+                    if resp.status_code == 200:
+                        self.rate_limiter.record_success()
+                        text = resp.text
+                        text_lower = text.lower()
 
-                    if has_title or has_extra or has_photo or has_action_btn:
-                        return UsernameStatus.TAKEN, {
+                        # Signatures of existing active profiles on t.me
+                        has_title = 'class="tgme_page_title"' in text
+                        has_extra = 'class="tgme_page_extra"' in text
+                        has_photo = 'class="tgme_page_photo' in text or 'tgme_page_photo_image' in text
+                        has_desc = 'class="tgme_page_description"' in text
+
+                        has_action_btn = 'class="tgme_action_button_new"' in text or 'class="tgme_page_action"' in text or "Send Message" in text
+
+                        if has_title or has_extra or has_photo or (has_action_btn and not has_desc):
+                            return UsernameStatus.TAKEN, {
+                                "source": "tme",
+                                "details": "Profile/Channel/Bot exists on Telegram",
+                                "fragment_data": fragment_res
+                            }
+
+                        # Multilingual phrases for free username invitation
+                        is_free_phrase = any(
+                            p in text_lower for p in [
+                                "if you have", "you can contact", "right away",
+                                "если у вас есть", "вы можете связаться", "прямо сейчас",
+                                "si tienes telegram", "puedes contactar",
+                                "wenn sie telegram haben", "können sie"
+                            ]
+                        )
+
+                        # A username is available to claim when:
+                        # 1) It has page description or username link, and NO profile title, extra, or photo
+                        # 2) Or has empty profile placeholder without profile elements
+                        is_free = (
+                            (has_desc and is_free_phrase and not has_title and not has_photo)
+                            or (has_desc and ('class="tgme_username_link"' in text or 'tgme_icon_user' in text) and not has_title and not has_photo)
+                            or (not has_title and not has_extra and not has_photo and not has_action_btn and (fragment_res.get("status") == "not_found" or not fragment_res.get("exists_on_fragment")))
+                        )
+                        if is_free:
+                            return UsernameStatus.AVAILABLE_TO_CLAIM, {
+                                "source": "tme",
+                                "details": "Empty profile placeholder on t.me. Available to claim.",
+                                "fragment_data": fragment_res
+                            }
+
+                        # If not taken on t.me and not on Fragment
+                        if fragment_res.get("status") == "not_found" or not fragment_res.get("exists_on_fragment"):
+                            return UsernameStatus.AVAILABLE_TO_CLAIM, {
+                                "source": "tme_and_fragment",
+                                "details": "No active profile found on t.me and not listed on Fragment. Available to claim.",
+                                "fragment_data": fragment_res
+                            }
+
+                        return UsernameStatus.UNKNOWN, {
                             "source": "tme",
-                            "details": "Profile/Channel/Bot exists on Telegram",
+                            "details": "t.me page returned non-standard structure",
                             "fragment_data": fragment_res
                         }
 
-                    # If not taken on t.me and not on Fragment
-                    if fragment_res.get("status") == "not_found" or not fragment_res.get("exists_on_fragment"):
-                        return UsernameStatus.AVAILABLE_TO_CLAIM, {
-                            "source": "tme_and_fragment",
-                            "details": "No active profile found on t.me and not listed on Fragment. Available to claim.",
+                    else:
+                        if attempt < max_attempts and resp.status_code in (500, 502, 503, 504):
+                            await asyncio.sleep(0.3)
+                            continue
+                        self.rate_limiter.record_error()
+                        return UsernameStatus.ERROR, {
+                            "source": "tme",
+                            "details": f"HTTP status error: {resp.status_code}",
                             "fragment_data": fragment_res
                         }
 
-                    return UsernameStatus.UNKNOWN, {
-                        "source": "tme",
-                        "details": "t.me page returned non-standard structure",
-                        "fragment_data": fragment_res
-                    }
+            except (httpx.TimeoutException, httpx.NetworkError) as e:
+                last_error_details = str(e)
+                if attempt < max_attempts:
+                    await asyncio.sleep(0.3)
+                    continue
+                self.rate_limiter.record_error()
+                is_timeout = isinstance(e, httpx.TimeoutException) or "timed out" in last_error_details.lower()
+                return UsernameStatus.ERROR, {
+                    "source": "tme",
+                    "details": "HTTP request timed out" if is_timeout else f"Network exception: {last_error_details}",
+                    "fragment_data": fragment_res
+                }
+            except Exception as e:
+                self.rate_limiter.record_error()
+                return UsernameStatus.ERROR, {
+                    "source": "tme",
+                    "details": f"Network exception: {e!s}",
+                    "fragment_data": fragment_res
+                }
 
-                else:
-                    self.rate_limiter.record_error()
-                    return UsernameStatus.ERROR, {
-                        "source": "tme",
-                        "details": f"HTTP status error: {resp.status_code}",
-                        "fragment_data": fragment_res
-                    }
-
-        except httpx.TimeoutException:
-            self.rate_limiter.record_error()
-            return UsernameStatus.ERROR, {
-                "source": "tme",
-                "details": "HTTP request timed out",
-                "fragment_data": fragment_res
-            }
-        except Exception as e:
-            self.rate_limiter.record_error()
-            return UsernameStatus.ERROR, {
-                "source": "tme",
-                "details": f"Network exception: {e!s}",
-                "fragment_data": fragment_res
-            }
+        return UsernameStatus.ERROR, {
+            "source": "tme",
+            "details": last_error_details or "Request failed without response",
+            "fragment_data": fragment_res
+        }

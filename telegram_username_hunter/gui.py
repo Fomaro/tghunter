@@ -6,13 +6,16 @@ Supports dynamic English/Russian language localization, performance modes, and r
 import asyncio
 import logging
 import os
+import re
 import threading
 import webbrowser
 from tkinter import messagebox, ttk
 from typing import Any
 
 import customtkinter as ctk
+import httpx
 
+from telegram_username_hunter import __version__
 from telegram_username_hunter.analysis.market_analysis import MarketPotentialAnalyzer
 from telegram_username_hunter.config.i18n import tr
 from telegram_username_hunter.config.settings import (
@@ -107,6 +110,9 @@ class HunterApp(ctk.CTk):
 
         # Default View
         self.navigate_to("Dashboard")
+
+        # Startup background update check
+        self.after(1500, self._start_update_check)
 
     def _t(self, key: str, default: str | None = None) -> str:
         """Helper to get translated string for current language."""
@@ -220,7 +226,11 @@ class HunterApp(ctk.CTk):
         self.content_container = ctk.CTkFrame(self, fg_color="transparent")
         self.content_container.grid(row=0, column=1, sticky="nsew")
         self.content_container.grid_columnconfigure(0, weight=1)
-        self.content_container.grid_rowconfigure(0, weight=1)
+        self.content_container.grid_rowconfigure(0, weight=0)  # Top notification banner
+        self.content_container.grid_rowconfigure(1, weight=1)  # Active view frame
+
+        self.update_banner: ctk.CTkFrame | None = None
+        self._latest_release_url: str = "https://github.com/Fomaro/tghunter/releases/latest"
 
         self.views: dict[str, Any] = {
             "Dashboard": DashboardView(self.content_container, self.db, on_navigate=self.navigate_to),
@@ -244,13 +254,109 @@ class HunterApp(ctk.CTk):
 
         for name, frame in self.views.items():
             if name == view_name:
-                frame.grid(row=0, column=0, sticky="nsew")
+                frame.grid(row=1, column=0, sticky="nsew")
                 if hasattr(frame, "refresh_stats"):
                     frame.refresh_stats()
                 elif hasattr(frame, "refresh_data"):
                     frame.refresh_data()
             else:
                 frame.grid_forget()
+
+    # ================= UPDATE CHECKER & NOTIFICATIONS =================
+
+    def _start_update_check(self, manual: bool = False) -> None:
+        """Launch background GitHub release check thread."""
+        t = threading.Thread(target=self._check_updates_worker, args=(manual,), daemon=True)
+        t.start()
+
+    def _check_updates_worker(self, manual: bool = False) -> None:
+        """Fetch latest GitHub Release metadata from official repo."""
+        repo_api_url = "https://api.github.com/repos/Fomaro/tghunter/releases/latest"
+        try:
+            with httpx.Client(timeout=6.0, follow_redirects=True) as client:
+                resp = client.get(repo_api_url, headers={"User-Agent": f"TelegramUsernameHunter/{__version__}"})
+                if resp.status_code == 200:
+                    data = resp.json()
+                    tag = data.get("tag_name", "").lstrip("v")
+                    html_url = data.get("html_url", "https://github.com/Fomaro/tghunter/releases/latest")
+                    self._latest_release_url = html_url
+                    current_ver = __version__.lstrip("v")
+
+                    def parse_v(v_str: str) -> tuple[int, ...]:
+                        nums = re.findall(r"\d+", v_str)
+                        return tuple(int(p) for p in nums) if nums else (0,)
+
+                    if parse_v(tag) > parse_v(current_ver):
+                        self.after(0, lambda: self._show_update_banner(data.get("tag_name", tag), html_url))
+                    elif manual:
+                        is_ru = (self.settings.language == "ru")
+                        msg = f"У вас установлена актуальная версия: v{__version__}" if is_ru else f"You are running the latest version: v{__version__}"
+                        self.after(0, lambda: messagebox.showinfo(
+                            "Проверка обновлений" if is_ru else "Update Check", msg
+                        ))
+                elif manual:
+                    is_ru = (self.settings.language == "ru")
+                    self.after(0, lambda: messagebox.showwarning(
+                        "Проверка обновлений" if is_ru else "Update Check",
+                        f"GitHub вернул статус {resp.status_code}. Проверьте https://github.com/Fomaro/tghunter/releases"
+                    ))
+        except Exception as e:
+            if manual:
+                is_ru = (self.settings.language == "ru")
+                err_msg = str(e)
+                self.after(0, lambda msg=err_msg: messagebox.showwarning(
+                    "Проверка обновлений" if is_ru else "Update Check",
+                    f"Не удалось связаться с сервером обновлений: {msg}"
+                ))
+
+    def _show_update_banner(self, tag_name: str, download_url: str) -> None:
+        """Display non-intrusive update notification banner at the top of content area."""
+        if self.update_banner and self.update_banner.winfo_exists():
+            self.update_banner.grid_forget()
+
+        self.update_banner = ctk.CTkFrame(
+            self.content_container,
+            fg_color="#1e1b4b",
+            border_color="#6366f1",
+            border_width=1,
+            corner_radius=8
+        )
+        self.update_banner.grid(row=0, column=0, sticky="ew", padx=20, pady=(10, 6))
+
+        is_ru = (self.settings.language == "ru")
+        banner_text = f"🚀 Доступна новая версия {tag_name}! Рекомендуется обновиться." if is_ru else f"🚀 New version {tag_name} is available! Update recommended."
+        lbl = ctk.CTkLabel(
+            self.update_banner,
+            text=banner_text,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#c7d2fe"
+        )
+        lbl.pack(side="left", padx=16, pady=8)
+
+        btn_dl = ctk.CTkButton(
+            self.update_banner,
+            text=self._t("btn_download_update"),
+            width=170,
+            height=28,
+            fg_color="#6366f1",
+            hover_color="#4f46e5",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=lambda: webbrowser.open(download_url)
+        )
+        btn_dl.pack(side="right", padx=(6, 12), pady=8)
+
+        btn_dismiss = ctk.CTkButton(
+            self.update_banner,
+            text="✕",
+            width=28,
+            height=28,
+            fg_color="transparent",
+            hover_color="#312e81",
+            text_color="#94a3b8",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=lambda: self.update_banner.grid_forget() if self.update_banner else None
+        )
+        btn_dismiss.pack(side="right", padx=(4, 2), pady=8)
 
     # ================= LANGUAGE SWITCHING & DYNAMIC TRANSLATION =================
 
@@ -378,12 +484,20 @@ class HunterApp(ctk.CTk):
                 set_view.btn_clear_db.configure(text=self._t("btn_reset_db"))
             if hasattr(set_view, "btn_open_exp") and set_view.btn_open_exp.winfo_exists():
                 set_view.btn_open_exp.configure(text=self._t("btn_open_exports"))
+            if hasattr(set_view, "btn_check_upd") and set_view.btn_check_upd.winfo_exists():
+                set_view.btn_check_upd.configure(text=self._t("btn_check_updates"))
 
         # Premium Selection View
         ps_view = self.views.get("Premium Selection")
         if ps_view:
             if hasattr(ps_view, "lbl_title") and ps_view.lbl_title.winfo_exists():
                 ps_view.lbl_title.configure(text=self._t("title_premium_selection"))
+            if hasattr(ps_view, "lbl_disclaimer") and ps_view.lbl_disclaimer.winfo_exists():
+                ps_view.lbl_disclaimer.configure(
+                    text="💡 Имена со свободным t.me могут принадлежать приватным профилям. Всегда проверяйте доступность в приложении Telegram."
+                    if is_ru else
+                    "💡 Names with empty t.me profiles may belong to private accounts. Always confirm availability in Telegram app."
+                )
             if hasattr(ps_view, "lbl_min_score") and ps_view.lbl_min_score.winfo_exists():
                 ps_view.lbl_min_score.configure(text=self._t("label_min_score"))
             if hasattr(ps_view, "lbl_sort_by") and ps_view.lbl_sort_by.winfo_exists():
@@ -394,6 +508,8 @@ class HunterApp(ctk.CTk):
                 ps_view.btn_export.configure(text=self._t("btn_export_sel"))
             if hasattr(ps_view, "btn_copy") and ps_view.btn_copy.winfo_exists():
                 ps_view.btn_copy.configure(text="📋 Скопировать имя" if is_ru else "📋 Copy Username")
+            if hasattr(ps_view, "btn_open_tg") and ps_view.btn_open_tg.winfo_exists():
+                ps_view.btn_open_tg.configure(text="📱 Открыть в Telegram" if is_ru else "📱 Open in Telegram")
             if hasattr(ps_view, "btn_open") and ps_view.btn_open.winfo_exists():
                 ps_view.btn_open.configure(text="🔗 Открыть на Fragment" if is_ru else "🔗 Open on Fragment")
             if hasattr(ps_view, "tree"):
@@ -669,8 +785,19 @@ class HunterApp(ctk.CTk):
         header.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 10))
 
         lbl = ctk.CTkLabel(header, text=self._t("title_premium_selection"), font=ctk.CTkFont(size=20, weight="bold"), text_color=TEXT_WHITE)
-        lbl.pack(anchor="w", padx=16, pady=(12, 6))
+        lbl.pack(anchor="w", padx=16, pady=(12, 4))
         view.lbl_title = lbl
+
+        lbl_disclaimer = ctk.CTkLabel(
+            header,
+            text="💡 Имена со свободным t.me могут принадлежать приватным профилям. Всегда проверяйте доступность в приложении Telegram."
+            if self.settings.language == "ru" else
+            "💡 Names with empty t.me profiles may belong to private accounts. Always confirm availability in Telegram app.",
+            font=ctk.CTkFont(size=11),
+            text_color="#94a3b8"
+        )
+        lbl_disclaimer.pack(anchor="w", padx=16, pady=(0, 8))
+        view.lbl_disclaimer = lbl_disclaimer
 
         # Filter bar
         f_bar = ctk.CTkFrame(header, fg_color="transparent")
@@ -705,13 +832,24 @@ class HunterApp(ctk.CTk):
         btn_export.pack(side="right", padx=4)
         view.btn_export = btn_export
 
-        # Action bar: Copy / Open Fragment
+        # Action bar: Copy / Open in Telegram / Open Fragment
         act_bar = ctk.CTkFrame(view, fg_color=CARD_DARK, corner_radius=8)
         act_bar.grid(row=1, column=0, sticky="ew", padx=20, pady=5)
 
         btn_copy = ctk.CTkButton(act_bar, text="📋 Copy Username", width=130, command=lambda: copy_selected())
         btn_copy.pack(side="left", padx=10, pady=8)
         view.btn_copy = btn_copy
+
+        btn_open_tg = ctk.CTkButton(
+            act_bar,
+            text="📱 Открыть в Telegram" if self.settings.language == "ru" else "📱 Open in Telegram",
+            width=150,
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
+            command=lambda: open_selected_telegram()
+        )
+        btn_open_tg.pack(side="left", padx=10, pady=8)
+        view.btn_open_tg = btn_open_tg
 
         btn_open = ctk.CTkButton(act_bar, text="🔗 Open on Fragment", width=150, fg_color="#0284c7", command=lambda: open_selected_fragment())
         btn_open.pack(side="left", padx=10, pady=8)
@@ -783,6 +921,14 @@ class HunterApp(ctk.CTk):
                     self.clipboard_append(val[0])
                     msg = f"Скопировано @{val[0]} в буфер!" if self.settings.language == "ru" else f"Copied @{val[0]} to clipboard!"
                     messagebox.showinfo("Copied", msg)
+
+        def open_selected_telegram():
+            cur = tree.focus()
+            if cur:
+                val = tree.item(cur, "values")
+                if val:
+                    u = val[0].lstrip("@")
+                    webbrowser.open(f"https://t.me/{u}")
 
         def open_selected_fragment():
             cur = tree.focus()
@@ -1116,6 +1262,13 @@ class HunterApp(ctk.CTk):
         )
         btn_open_exp.grid(row=8, column=2, sticky="w", padx=16, pady=(15, 20))
         view.btn_open_exp = btn_open_exp
+
+        btn_check_upd = ctk.CTkButton(
+            form, text=self._t("btn_check_updates"), width=170, fg_color="#6366f1", hover_color="#4f46e5",
+            command=lambda: self._start_update_check(manual=True),
+        )
+        btn_check_upd.grid(row=8, column=3, sticky="w", padx=16, pady=(15, 20))
+        view.btn_check_upd = btn_check_upd
 
         def save_conf():
             try:

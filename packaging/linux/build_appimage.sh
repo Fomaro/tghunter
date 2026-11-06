@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "=== Building AppImage for Telegram Username Hunter ==="
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 APP_DIR="dist/AppDir"
 
 rm -rf "${APP_DIR}"

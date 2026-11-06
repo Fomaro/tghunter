@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-11-06
+
+### Added
+- **Startup Update Check**: Automated non-blocking check on application launch against GitHub Releases API with notification banner and direct download button.
+- **Manual Update Check**: Dedicated "Check for Updates" button in Settings panel.
+- **Telegram Direct Open Action**: Instant `📱 Open in Telegram` button in Premium Selection to verify username status directly in the Telegram client.
+- **System Reserved Handles List**: Built-in protection against false-positive availability for system reserved words (`cloud`, `admin`, `support`, etc.).
+
+### Fixed
+- **Network Glitch False Errors**: Added 2-attempt retry loop with exponential backoff on transient timeouts/errors in all checkers (`escrowcap` and others).
+- **Fragment Taken Status Parsing**: Fixed CSS badge priority in FragmentChecker (`tm-status-taken`, `tm-status-unavail`) preventing occupied/taken names (`zarsyr`, `cloud`, etc.) from falsely appearing as available.
+- **Premium Selection Verification Warning**: Added clear disclaimer noting that usernames with blank t.me profiles might belong to private accounts or be reserved.
+
 ## [1.0.0] - 2026-11-06
 
 ### Added

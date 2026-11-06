@@ -68,7 +68,7 @@ jobs:
           name: windows-builds
           path: |
             dist/TelegramUsernameHunter_Portable.exe
-            dist/TelegramUsernameHunter_Setup_v1.0.0.exe
+            dist/TelegramUsernameHunter_Setup_*.exe
 
   build-linux:
     name: Build Linux Binaries

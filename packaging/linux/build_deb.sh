@@ -16,7 +16,7 @@ mkdir -p "${BUILD_DIR}/usr/share/applications"
 mkdir -p "${BUILD_DIR}/usr/share/icons/hicolor/512x512/apps"
 
 # 1. Build PyInstaller binary on Linux if not present
-if [ ! -f "dist/linux_bin/TelegramUsernameHunter" ]; then
+if [ ! -f "dist/linux_bin/TelegramUsernameHunter/TelegramUsernameHunter" ]; then
     echo "Compiling standalone Linux binary with PyInstaller..."
     python3 -m PyInstaller --noconfirm --onedir --windowed \
         --name=TelegramUsernameHunter \

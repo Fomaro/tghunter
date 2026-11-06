@@ -46,7 +46,8 @@ chmod +x "${APP_DIR}/AppRun"
 # 4. Download appimagetool if missing
 if [ ! -f "appimagetool" ]; then
     echo "Downloading appimagetool..."
-    curl -fsSL -o appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+    curl -fsSL -o appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" || \
+    curl -fsSL -o appimagetool "https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage"
     chmod +x appimagetool
 fi
 

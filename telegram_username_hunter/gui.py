@@ -17,14 +17,17 @@ import httpx
 
 from telegram_username_hunter import __version__
 from telegram_username_hunter.analysis.market_analysis import MarketPotentialAnalyzer
-from telegram_username_hunter.config.i18n import tr
+from telegram_username_hunter.config.i18n import (
+    format_availability_status,
+    format_fragment_status,
+    tr,
+)
 from telegram_username_hunter.config.settings import (
     DEFAULT_SETTINGS,
     AppSettings,
     BotStatus,
     PerformanceMode,
     PremiumBotStatus,
-    UsernameStatus,
 )
 from telegram_username_hunter.dashboard import DashboardView
 from telegram_username_hunter.database.database import DatabaseManager
@@ -500,6 +503,34 @@ class HunterApp(ctk.CTk):
                 )
             if hasattr(ps_view, "lbl_min_score") and ps_view.lbl_min_score.winfo_exists():
                 ps_view.lbl_min_score.configure(text=self._t("label_min_score"))
+            if hasattr(ps_view, "lbl_avail") and ps_view.lbl_avail.winfo_exists():
+                ps_view.lbl_avail.configure(text=self._t("filter_availability"))
+            if hasattr(ps_view, "avail_combo") and ps_view.avail_combo.winfo_exists():
+                avail_values = [
+                    "Свободные (AVAILABLE)", "Можно купить (Fragment)", "Занятые (OCCUPIED)",
+                    "Ограниченные (RESTRICTED)", "Недействительные (INVALID)", "Не проверено (UNKNOWN)", "Все статусы"
+                ] if is_ru else [
+                    "Available only (AVAILABLE)", "Purchase Available (Fragment)", "Occupied (OCCUPIED)",
+                    "Restricted (RESTRICTED)", "Invalid (INVALID)", "Unknown (UNKNOWN)", "All Statuses"
+                ]
+                old_val = ps_view.avail_combo.get()
+                ps_view.avail_combo.configure(values=avail_values)
+                if old_val not in avail_values:
+                    ps_view.avail_combo.set(avail_values[0])
+
+            if hasattr(ps_view, "lbl_frag") and ps_view.lbl_frag.winfo_exists():
+                ps_view.lbl_frag.configure(text=self._t("filter_fragment"))
+            if hasattr(ps_view, "frag_combo") and ps_view.frag_combo.winfo_exists():
+                frag_values = [
+                    "Все (Fragment)", "Аукцион доступен", "Аукцион не поддерживается", "Можно приобрести"
+                ] if is_ru else [
+                    "All (Fragment)", "Auction Supported", "Auction Not Supported", "Purchase Available"
+                ]
+                old_val = ps_view.frag_combo.get()
+                ps_view.frag_combo.configure(values=frag_values)
+                if old_val not in frag_values:
+                    ps_view.frag_combo.set(frag_values[0])
+
             if hasattr(ps_view, "lbl_sort_by") and ps_view.lbl_sort_by.winfo_exists():
                 ps_view.lbl_sort_by.configure(text=self._t("label_sort_by"))
             if hasattr(ps_view, "btn_filter") and ps_view.btn_filter.winfo_exists():
@@ -803,30 +834,66 @@ class HunterApp(ctk.CTk):
         f_bar = ctk.CTkFrame(header, fg_color="transparent")
         f_bar.pack(fill="x", padx=16, pady=(0, 12))
 
+        is_ru = (self.settings.language == "ru")
+
+        # 1. Min score
         lbl_min_score = ctk.CTkLabel(f_bar, text=self._t("label_min_score"), font=ctk.CTkFont(weight="bold"))
-        lbl_min_score.pack(side="left", padx=(0, 6))
+        lbl_min_score.pack(side="left", padx=(0, 4))
         view.lbl_min_score = lbl_min_score
 
-        score_combo = ctk.CTkComboBox(f_bar, values=["50+", "60+", "70+", "80+", "90+"], width=80)
+        score_combo = ctk.CTkComboBox(f_bar, values=["50+", "60+", "70+", "80+", "90+"], width=75)
         score_combo.set("70+")
-        score_combo.pack(side="left", padx=(0, 16))
+        score_combo.pack(side="left", padx=(0, 10))
         view.score_combo = score_combo
 
+        # 2. Availability filter
+        lbl_avail = ctk.CTkLabel(f_bar, text=self._t("filter_availability"), font=ctk.CTkFont(weight="bold"))
+        lbl_avail.pack(side="left", padx=(0, 4))
+        view.lbl_avail = lbl_avail
+
+        avail_values = [
+            "Свободные (AVAILABLE)", "Можно купить (Fragment)", "Занятые (OCCUPIED)",
+            "Ограниченные (RESTRICTED)", "Недействительные (INVALID)", "Не проверено (UNKNOWN)", "Все статусы"
+        ] if is_ru else [
+            "Available only (AVAILABLE)", "Purchase Available (Fragment)", "Occupied (OCCUPIED)",
+            "Restricted (RESTRICTED)", "Invalid (INVALID)", "Unknown (UNKNOWN)", "All Statuses"
+        ]
+        avail_combo = ctk.CTkComboBox(f_bar, values=avail_values, width=175)
+        avail_combo.set(avail_values[0])
+        avail_combo.pack(side="left", padx=(0, 10))
+        view.avail_combo = avail_combo
+
+        # 3. Fragment filter
+        lbl_frag = ctk.CTkLabel(f_bar, text=self._t("filter_fragment"), font=ctk.CTkFont(weight="bold"))
+        lbl_frag.pack(side="left", padx=(0, 4))
+        view.lbl_frag = lbl_frag
+
+        frag_values = [
+            "Все (Fragment)", "Аукцион доступен", "Аукцион не поддерживается", "Можно приобрести"
+        ] if is_ru else [
+            "All (Fragment)", "Auction Supported", "Auction Not Supported", "Purchase Available"
+        ]
+        frag_combo = ctk.CTkComboBox(f_bar, values=frag_values, width=160)
+        frag_combo.set(frag_values[0])
+        frag_combo.pack(side="left", padx=(0, 10))
+        view.frag_combo = frag_combo
+
+        # 4. Sort
         lbl_sort_by = ctk.CTkLabel(f_bar, text=self._t("label_sort_by"), font=ctk.CTkFont(weight="bold"))
-        lbl_sort_by.pack(side="left", padx=(0, 6))
+        lbl_sort_by.pack(side="left", padx=(0, 4))
         view.lbl_sort_by = lbl_sort_by
 
-        sort_combo = ctk.CTkComboBox(f_bar, values=["Score (High-Low)", "Length (Shortest)", "Date"], width=150)
+        sort_combo = ctk.CTkComboBox(f_bar, values=["Score (High-Low)", "Length (Shortest)", "Date"], width=135)
         sort_combo.set("Score (High-Low)")
-        sort_combo.pack(side="left", padx=(0, 16))
+        sort_combo.pack(side="left", padx=(0, 10))
         view.sort_combo = sort_combo
 
-        btn_filter = ctk.CTkButton(f_bar, text="Apply Filter", width=100, command=lambda: refresh_sel())
+        btn_filter = ctk.CTkButton(f_bar, text="Применить" if is_ru else "Apply", width=90, command=lambda: refresh_sel())
         btn_filter.pack(side="left", padx=4)
         view.btn_filter = btn_filter
 
         btn_export = ctk.CTkButton(
-            f_bar, text=self._t("btn_export_sel"), width=150, fg_color="#7c3aed",
+            f_bar, text=self._t("btn_export_sel"), width=135, fg_color="#7c3aed",
             command=lambda: self._export_premium_sel(int(score_combo.get().replace("+", ""))),
         )
         btn_export.pack(side="right", padx=4)
@@ -895,9 +962,34 @@ class HunterApp(ctk.CTk):
             sort_val = sort_combo.get()
             sort_by = "score" if "Score" in sort_val else ("length" if "Length" in sort_val else "date")
 
+            avail_raw = avail_combo.get()
+            status_param: str | None = None
+            if "AVAILABLE" in avail_raw and "Purchase Available" not in avail_raw and "Можно купить" not in avail_raw:
+                status_param = "AVAILABLE"
+            elif "OCCUPIED" in avail_raw:
+                status_param = "OCCUPIED"
+            elif "RESTRICTED" in avail_raw:
+                status_param = "RESTRICTED"
+            elif "INVALID" in avail_raw:
+                status_param = "INVALID"
+            elif "UNKNOWN" in avail_raw:
+                status_param = "UNKNOWN"
+
+            frag_raw = frag_combo.get()
+            frag_param: str | None = None
+            if "Можно купить" in avail_raw or "Purchase Available (Fragment)" in avail_raw:
+                frag_param = "PURCHASE_AVAILABLE"
+            elif "AUCTION_SUPPORTED" in frag_raw or "Аукцион доступен" in frag_raw or "Auction Supported" in frag_raw:
+                frag_param = "AUCTION_SUPPORTED"
+            elif "AUCTION_NOT_SUPPORTED" in frag_raw or "Аукцион не поддерживается" in frag_raw or "Auction Not Supported" in frag_raw:
+                frag_param = "AUCTION_NOT_SUPPORTED"
+            elif "PURCHASE_AVAILABLE" in frag_raw or "Можно купить" in frag_raw or "Можно приобрести" in frag_raw or "Purchase Available" in frag_raw:
+                frag_param = "PURCHASE_AVAILABLE"
+
             records = self.db.get_usernames(
                 limit=1000,
-                status=UsernameStatus.AVAILABLE_TO_CLAIM.value,
+                status=status_param,
+                auction_eligibility=frag_param,
                 min_score=min_sc,
                 sort_by=sort_by,
                 sort_asc=(sort_by == "length"),
@@ -905,8 +997,13 @@ class HunterApp(ctk.CTk):
             tree.delete(*tree.get_children())
             for r in records:
                 tree.insert("", "end", values=(
-                    r.username, r.length, f"{r.score}/100", r.category,
-                    r.status, r.auction_eligibility, (r.last_checked_at or "")[:19],
+                    r.username,
+                    r.length,
+                    f"{r.score}/100",
+                    r.category,
+                    format_availability_status(r.status, self.settings.language),
+                    format_fragment_status(r.auction_eligibility, self.settings.language),
+                    (r.last_checked_at or "")[:19],
                 ))
             is_ru = (self.settings.language == "ru")
             prefix = "Найдено:" if is_ru else "Total Matching:"

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.2] - 2026-11-06
+
+### Added
+- **MTProto Protocol Definitions & Specification Checkers**: Integrated official Telegram MTProto specifications (`account.checkUsername`, `contacts.resolveUsername`, `channels.checkUsername`).
+- **Independent Two-Component Status Taxonomy**: Strict separation between **Availability Status** (`AVAILABLE`, `OCCUPIED`, `INVALID`, `RESTRICTED`, `UNKNOWN`, `ERROR`) and **Fragment Status** (`AUCTION_SUPPORTED`, `AUCTION_NOT_SUPPORTED`, `PURCHASE_AVAILABLE`, `AUCTION_UNKNOWN`).
+- **Telegram Policy Word Blacklist**: Server-level protected dictionary words and anti-squatting handles (`viper`, `amber`, `cloud`, `admin`, etc.) that trigger `USERNAME_INVALID` in MTProto are mapped to `RESTRICTED`.
+- **4-Character Handle Specialization**: 4-char handles (`shop`, `game`) recognized as Fragment Collectibles (`RESTRICTED` + `PURCHASE_AVAILABLE`), preventing false claim attempts on standard user accounts.
+- **Dual Status Filter in UI**: Added separate dropdown filters for Availability Status and Fragment Status in "Premium Selection" table.
+- **Comprehensive Availability Test Suite**: 12 automated unit and integration tests (`tests/test_username_availability.py`) covering all MTProto RPC responses and regression verifying 0% false positives.
+- **Audit Documentation**: Detailed root cause analysis and Telegram MTProto behavior specification published in `USERNAME_AVAILABILITY_AUDIT.md`.
+
+### Fixed
+- **`viper` False Positive Regression**: Fixed false `AVAILABLE` reporting for `viper` and other empty `t.me` profiles where MTProto returns `USERNAME_INVALID`.
+- **Unconfirmed Web 404 Availability Assumption**: The absence of a public profile on `t.me` without MTProto verification now returns `UNKNOWN` instead of `AVAILABLE`.
+- **UI Table Status Formatting**: Localized Russian and English status rendering in GUI tables and exports.
+
 ## [1.0.1] - 2026-11-06
 
 ### Added

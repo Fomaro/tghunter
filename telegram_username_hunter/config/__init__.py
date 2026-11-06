@@ -1,4 +1,9 @@
-from telegram_username_hunter.config.i18n import TRANSLATIONS, tr
+from telegram_username_hunter.config.i18n import (
+    TRANSLATIONS,
+    format_availability_status,
+    format_fragment_status,
+    tr,
+)
 from telegram_username_hunter.config.settings import (
     BASE_DIR,
     DATA_DIR,
@@ -9,6 +14,7 @@ from telegram_username_hunter.config.settings import (
     AppSettings,
     AuctionEligibility,
     BotStatus,
+    FragmentStatus,
     PerformanceMode,
     PerformanceProfile,
     PremiumBotStatus,
@@ -24,6 +30,7 @@ __all__ = [
     "LOGS_DIR",
     "AppSettings",
     "AuctionEligibility",
+    "FragmentStatus",
     "BotStatus",
     "PerformanceMode",
     "PerformanceProfile",
@@ -32,5 +39,7 @@ __all__ = [
     "UsernameCategory",
     "UsernameStatus",
     "TRANSLATIONS",
+    "format_availability_status",
+    "format_fragment_status",
     "tr",
 ]

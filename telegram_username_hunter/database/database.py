@@ -222,6 +222,7 @@ class DatabaseManager:
         status: str | None = None,
         min_score: int = 0,
         category: str | None = None,
+        auction_eligibility: str | None = None,
         sort_by: str = "score",
         sort_asc: bool = False
     ) -> list[UsernameRecord]:
@@ -233,11 +234,24 @@ class DatabaseManager:
         params: list[Any] = [min_score]
 
         if status:
-            query_parts.append("AND status = ?")
-            params.append(status)
+            if status in ("AVAILABLE", "AVAILABLE_TO_CLAIM"):
+                query_parts.append("AND status IN ('AVAILABLE', 'AVAILABLE_TO_CLAIM')")
+            elif status in ("OCCUPIED", "TAKEN"):
+                query_parts.append("AND status IN ('OCCUPIED', 'TAKEN')")
+            elif status in ("RESTRICTED", "RESERVED", "COLLECTIBLE"):
+                query_parts.append("AND status IN ('RESTRICTED', 'RESERVED', 'COLLECTIBLE')")
+            else:
+                query_parts.append("AND status = ?")
+                params.append(status)
         if category:
             query_parts.append("AND category = ?")
             params.append(category)
+        if auction_eligibility:
+            if auction_eligibility in ("AUCTION_SUPPORTED", "AUCTION_ELIGIBLE"):
+                query_parts.append("AND auction_eligibility IN ('AUCTION_SUPPORTED', 'AUCTION_ELIGIBLE')")
+            else:
+                query_parts.append("AND auction_eligibility = ?")
+                params.append(auction_eligibility)
 
         # Safe order column from static dictionary mapping
         query_parts.append(f"ORDER BY {order_col} {direction} LIMIT ? OFFSET ?")

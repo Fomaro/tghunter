@@ -32,40 +32,42 @@ class AuctionEligibilityAnalyzer:
         Analyze regular username.
         Returns (item_type, auction_eligibility, explanation).
         """
-        # If Fragment confirmed it is already a collectible
-        if status == UsernameStatus.COLLECTIBLE.value or fragment_details.get("is_collectible"):
+        frag_status = fragment_details.get("status", "")
+        is_collectible = fragment_details.get("is_collectible", False)
+
+        # 1. Available for purchase / bidding on Fragment
+        if frag_status in ("available", "in_auction", "sale") or fragment_details.get("price_ton") is not None or fragment_details.get("purchase_available"):
+            return (
+                "FRAGMENT_COLLECTIBLE",
+                AuctionEligibility.PURCHASE_AVAILABLE.value,
+                "Listed on Fragment: available for purchase, auction bidding, or direct acquisition."
+            )
+
+        # 2. Collectible NFT on Fragment (supports auction / secondary market)
+        if is_collectible or frag_status == "sold":
             return (
                 "COLLECTIBLE_USERNAME",
-                AuctionEligibility.AUCTION_ELIGIBLE.value,
-                "Confirmed Collectible on Fragment. Can be traded on the Fragment secondary market."
+                AuctionEligibility.AUCTION_SUPPORTED.value,
+                "Confirmed Collectible on Fragment. Supports trading and auctions on secondary marketplace."
             )
 
-        # If it is available to claim
-        if status == UsernameStatus.AVAILABLE_TO_CLAIM.value:
+        # 3. Not supported on Fragment auction
+        if frag_status in ("not_found", "unavailable") or status in (
+            UsernameStatus.AVAILABLE.value,
+            UsernameStatus.OCCUPIED.value,
+            UsernameStatus.RESTRICTED.value,
+            UsernameStatus.INVALID.value,
+        ):
             return (
                 "BASIC_USERNAME",
                 AuctionEligibility.AUCTION_NOT_SUPPORTED.value,
-                "Standard Telegram username. Must first be claimed via Telegram, then converted to Collectible via Fragment TON auction fee."
-            )
-
-        if status == UsernameStatus.TAKEN.value:
-            return (
-                "BASIC_USERNAME",
-                AuctionEligibility.AUCTION_NOT_SUPPORTED.value,
-                "Already occupied by an account. Cannot be auctioned unless owned and converted by the holder."
-            )
-
-        if status == UsernameStatus.RESERVED.value or status == UsernameStatus.INVALID.value:
-            return (
-                "BASIC_USERNAME",
-                AuctionEligibility.AUCTION_NOT_SUPPORTED.value,
-                "Reserved by Telegram or invalid syntax."
+                "Standard Telegram handle. Fragment auction not supported unless converted by owner."
             )
 
         return (
             "BASIC_USERNAME",
             AuctionEligibility.AUCTION_UNKNOWN.value,
-            "Verification pending or incomplete."
+            "Verification pending or Fragment status could not be determined."
         )
 
     @classmethod
@@ -78,18 +80,26 @@ class AuctionEligibilityAnalyzer:
         """
         Analyze bot username for auction capability.
         """
-        if fragment_details.get("is_collectible"):
+        frag_status = fragment_details.get("status", "")
+        if frag_status in ("available", "in_auction", "sale") or fragment_details.get("price_ton") is not None:
+            return (
+                "FRAGMENT_COLLECTIBLE",
+                AuctionEligibility.PURCHASE_AVAILABLE.value,
+                "Bot username is listed on Fragment for purchase or auction."
+            )
+
+        if fragment_details.get("is_collectible") or frag_status == "sold":
             return (
                 "COLLECTIBLE_USERNAME",
-                AuctionEligibility.AUCTION_ELIGIBLE.value,
+                AuctionEligibility.AUCTION_SUPPORTED.value,
                 "Bot username is registered as Fragment TON collectible NFT."
             )
 
-        if status == BotStatus.AVAILABLE_FOR_BOT.value:
+        if status == BotStatus.AVAILABLE.value:
             return (
                 "BOT_USERNAME",
                 AuctionEligibility.AUCTION_NOT_SUPPORTED.value,
-                "Free for BotFather registration. Cannot be auctioned on Fragment directly without TON collectible conversion."
+                "Available for BotFather registration. Fragment auction not supported."
             )
 
         return (

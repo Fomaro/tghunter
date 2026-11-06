@@ -134,6 +134,25 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "dash_btn_regular": "🎯 Поиск юзернеймов",
         "dash_btn_bot": "🤖 Поиск ботов",
         "dash_btn_premium": "✨ Премиум имена ботов",
+
+        # Human-Readable Availability Statuses
+        "status_available": "Свободен",
+        "status_occupied": "Занят",
+        "status_invalid": "Недействителен",
+        "status_restricted": "Ограничен",
+        "status_unknown": "Не удалось проверить",
+        "status_error": "Ошибка",
+
+        # Human-Readable Fragment Statuses
+        "frag_auction_supported": "Аукцион доступен",
+        "frag_auction_not_supported": "Аукцион не поддерживается",
+        "frag_purchase_available": "Можно приобрести на Fragment",
+        "frag_auction_unknown": "Не удалось определить",
+
+        # Filters
+        "filter_availability": "Доступность:",
+        "filter_fragment": "Статус Fragment:",
+        "filter_all": "Все",
     },
     "en": {
         # App brand & window
@@ -264,6 +283,25 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "dash_btn_regular": "🎯 Launch Username Hunter",
         "dash_btn_bot": "🤖 Launch Bot Hunter",
         "dash_btn_premium": "✨ Launch Premium Bot Names",
+
+        # Human-Readable Availability Statuses
+        "status_available": "Available",
+        "status_occupied": "Occupied",
+        "status_invalid": "Invalid",
+        "status_restricted": "Restricted",
+        "status_unknown": "Unknown",
+        "status_error": "Error",
+
+        # Human-Readable Fragment Statuses
+        "frag_auction_supported": "Auction Supported",
+        "frag_auction_not_supported": "Auction Not Supported",
+        "frag_purchase_available": "Purchase on Fragment",
+        "frag_auction_unknown": "Unknown",
+
+        # Filters
+        "filter_availability": "Availability:",
+        "filter_fragment": "Fragment Status:",
+        "filter_all": "All",
     }
 }
 
@@ -278,3 +316,32 @@ def tr(key: str, lang: str = "ru", default: str | None = None) -> str:
     if key in en_map:
         return en_map[key]
     return default if default is not None else key
+
+
+def format_availability_status(status: str, lang: str = "ru") -> str:
+    """Map raw technical status code to user-facing localized display string."""
+    key = {
+        "AVAILABLE": "status_available",
+        "AVAILABLE_TO_CLAIM": "status_available",
+        "OCCUPIED": "status_occupied",
+        "TAKEN": "status_occupied",
+        "INVALID": "status_invalid",
+        "RESTRICTED": "status_restricted",
+        "RESERVED": "status_restricted",
+        "COLLECTIBLE": "status_restricted",
+        "UNKNOWN": "status_unknown",
+        "ERROR": "status_error",
+    }.get(status.upper(), "status_unknown")
+    return tr(key, lang=lang, default=status)
+
+
+def format_fragment_status(frag_status: str, lang: str = "ru") -> str:
+    """Map Fragment lot status code to user-facing localized display string."""
+    key = {
+        "AUCTION_SUPPORTED": "frag_auction_supported",
+        "AUCTION_ELIGIBLE": "frag_auction_supported",
+        "AUCTION_NOT_SUPPORTED": "frag_auction_not_supported",
+        "PURCHASE_AVAILABLE": "frag_purchase_available",
+        "AUCTION_UNKNOWN": "frag_auction_unknown",
+    }.get(frag_status.upper(), "frag_auction_unknown")
+    return tr(key, lang=lang, default=frag_status)

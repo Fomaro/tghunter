@@ -134,12 +134,12 @@ async def test_telegram_checker_live_branches():
         status, details = await tc.check_username("freeuser")
         assert status == UsernameStatus.AVAILABLE_TO_CLAIM
 
-    # 404 Free
+    # 404 on t.me without MTProto session yields UNKNOWN (never false positive AVAILABLE)
     mock_resp_404 = AsyncMock()
     mock_resp_404.status_code = 404
     with patch("httpx.AsyncClient.get", return_value=mock_resp_404):
         status, details = await tc.check_username("notfoundname")
-        assert status == UsernameStatus.AVAILABLE_TO_CLAIM
+        assert status == UsernameStatus.UNKNOWN
 
 
 @pytest.mark.asyncio

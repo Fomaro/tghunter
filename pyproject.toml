@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+ignore = [
+    "E501",  # Line too long (managed by formatter)
+    "B008",  # Do not perform function call in argument defaults
+    "B904",  # Within an except clause, raise exceptions with from
+]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+pythonpath = "."
+asyncio_mode = "auto"
+testpaths = ["tests"]

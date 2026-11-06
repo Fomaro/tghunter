@@ -1,0 +1,69 @@
+name: Bug Report
+description: Report an issue or unexpected behavior in Telegram Username Hunter
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please provide as much context as possible so we can reproduce and resolve it.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows 11 (64-bit)
+        - Windows 10 (64-bit)
+        - Ubuntu / Debian (x86_64)
+        - Other Linux
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: distribution
+    attributes:
+      label: Distribution Type
+      options:
+        - Windows Portable (.exe)
+        - Windows Installer (.exe)
+        - Linux AppImage
+        - Linux Debian Package (.deb)
+        - Source code (Python 3.12)
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: perf_mode
+    attributes:
+      label: Performance Mode Active
+      options:
+        - Standard (Default)
+        - Economy
+        - Fast
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: E.g., username was reported as ERROR instead of AVAILABLE_TO_CLAIM...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: What actions did you take leading up to the issue?
+      placeholder: |
+        1. Open 'Username Hunter'
+        2. Select category '5 chars'
+        3. Click 'Start Search'
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log Output or Screenshots
+      description: Paste relevant logs from `logs/hunter.log` or error messages.
+      render: shell

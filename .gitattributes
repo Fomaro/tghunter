@@ -1,0 +1,26 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python and text files
+*.py text eol=lf
+*.md text
+*.toml text
+*.ini text
+*.txt text
+*.json text
+*.yml text
+*.yaml text
+
+# Shell scripts must have LF
+*.sh text eol=lf
+
+# Inno Setup scripts
+*.iss text eol=crlf
+
+# Binary files
+*.png binary
+*.ico binary
+*.exe binary
+*.deb binary
+*.AppImage binary
+*.db binary

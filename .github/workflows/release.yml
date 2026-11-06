@@ -1,0 +1,150 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release Version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows Binaries
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pytest pytest-asyncio pytest-cov
+
+      - name: Run Test Suite
+        run: python -m pytest tests/ -v
+
+      - name: Build Windows Portable (OneFile)
+        run: |
+          python -m PyInstaller --noconfirm --onefile --windowed `
+            --name=TelegramUsernameHunter_Portable `
+            --icon=assets/icon.ico `
+            --collect-all=customtkinter `
+            --add-data="telegram_username_hunter;telegram_username_hunter" `
+            main.py
+
+      - name: Build Windows Directory for Installer
+        run: |
+          python -m PyInstaller --noconfirm --onedir --windowed `
+            --name=TelegramUsernameHunterPRO `
+            --icon=assets/icon.ico `
+            --collect-all=customtkinter `
+            --add-data="telegram_username_hunter;telegram_username_hunter" `
+            main.py
+
+      - name: Compile Inno Setup Installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\setup.iss
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-builds
+          path: |
+            dist/TelegramUsernameHunter_Portable.exe
+            dist/TelegramUsernameHunter_Setup_v1.0.0.exe
+
+  build-linux:
+    name: Build Linux Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Linux system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk xvfb libfuse2
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pytest pytest-asyncio pytest-cov
+
+      - name: Run Tests
+        run: xvfb-run -a python3 -m pytest tests/ -v
+
+      - name: Build Debian Package (.deb)
+        run: |
+          chmod +x packaging/linux/build_deb.sh
+          ./packaging/linux/build_deb.sh
+
+      - name: Build AppImage (.AppImage)
+        run: |
+          chmod +x packaging/linux/build_appimage.sh
+          ./packaging/linux/build_appimage.sh
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-builds
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          merge-multiple: true
+
+      - name: Compute SHA-256 Checksums
+        run: |
+          mkdir -p release_dist
+          cp release_assets/* release_dist/ || true
+          cd release_dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create Release and Upload Binaries
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          name: Telegram Username Hunter ${{ github.ref_name || inputs.version }}
+          tag_name: ${{ github.ref_name || inputs.version }}
+          files: |
+            release_dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

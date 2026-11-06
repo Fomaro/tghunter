@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Telegram Username Hunter
+Comment=Automated tool for Telegram username hunting, valuation, and Fragment auction monitoring
+Exec=telegram-username-hunter
+Icon=telegram-username-hunter
+Terminal=false
+Type=Application
+Categories=Utility;Network;
+Keywords=telegram;username;hunter;fragment;ton;
+StartupNotify=true
